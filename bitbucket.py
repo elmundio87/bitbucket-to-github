@@ -10,7 +10,6 @@ load_dotenv() # Create a .env file with your Bitbucket username and app password
 # Replace with your Bitbucket username and app password
 BITBUCKET_USERNAME = os.getenv("BITBUCKET_USERNAME")
 BITBUCKET_APP_PASSWORD = os.getenv("BITBUCKET_APP_PASSWORD")
-WORKSPACE = os.getenv("WORKSPACE")
 
 # Configure the logging
 timestamp = time.strftime("%Y%m%d-%H%M%S")
@@ -31,7 +30,7 @@ def git_clone(workspace, project, repo):
     command = ["git", "-C", f"{root_dir}/{repo}.git", "fetch", "--prune", "origin"]
     print(f"Updating: {workspace}/{project}/{repo}")
   else:
-    command = ["git", "clone", "--mirror", f"https://{BITBUCKET_USERNAME}:{BITBUCKET_APP_PASSWORD}@bitbucket.org/{WORKSPACE}/{repo}.git", f"{root_dir}/{repo}.git"]
+    command = ["git", "clone", "--mirror", f"https://{BITBUCKET_USERNAME}:{BITBUCKET_APP_PASSWORD}@bitbucket.org/{workspace}/{repo}.git", f"{root_dir}/{repo}.git"]
     print(f"Cloning: {workspace}/{project}/{repo}")
   try:
       result = subprocess.run(command, capture_output=True, text=True, check=True)
@@ -53,7 +52,7 @@ def main():
     for workspace in bitbucket.workspaces.each():
         for project in workspace.projects.each():
             for repo in project.repositories.each():
-                git_clone(workspace.name, project.name, repo.name)
+                git_clone(workspace.slug, project.name, repo.name)
 
 if __name__ == "__main__":
     main()
