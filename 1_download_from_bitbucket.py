@@ -40,6 +40,16 @@ def git_clone(workspace, project, repo):
       logging.error(e.stderr)
       print("ERROR: See log file for details")
 
+def git_lfs(workspace, project, repo):
+  root_dir = make_dir_structure(workspace, project)
+  command = ["git", "-C", f"{root_dir}/{repo}.git", "lfs", "fetch", "--all"]
+  print(f"Git LFS Update: {workspace}/{project}/{repo}")
+  try:
+      subprocess.run(command, capture_output=True, text=True, check=True)
+  except subprocess.CalledProcessError as e:
+      logging.error(e.stderr)
+      print("ERROR: See log file for details")
+
 # for each workspace
 # for each project
 # for each repository
@@ -59,7 +69,7 @@ def main():
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=num_cores) as executor:
         executor.map(lambda x: git_clone(*x), jobs)
-
+        executor.map(lambda x: git_lfs(*x), jobs)
 
 if __name__ == "__main__":
     main()

@@ -4,8 +4,10 @@ import os
 import subprocess
 import logging
 import time
+import concurrent.futures
 
 load_dotenv() # Create a .env file with your Bitbucket username and app password
+num_cores = os.cpu_count()
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_OWNER = os.getenv("GITHUB_OWNER")
@@ -24,6 +26,12 @@ class GitHubRepoMapping:
     self.workspace = workspace
     self.project = project
     self.repo = repo
+
+  def do_it(self):
+    self.create_repo()
+    self.apply_topics()
+    self.push_repo()
+    self.push_lfs()
 
   def create_repo(self):
     url = f'{GITHUB_API_URL}/orgs/{GITHUB_OWNER}/repos'
@@ -62,7 +70,16 @@ class GitHubRepoMapping:
         print(f'Failed to apply topics to {self.repo}: {response.status_code} - {response.text}')
 
   def push_repo(self):
-    command = ["git", "-C", f"mirrors/{self.workspace}/{self.project}/{repo}.git", "push", "--all", f"https://github.com/{GITHUB_OWNER}/{self.repo}.git"]
+    command = ["git", "-C", f"mirrors/{self.workspace}/{self.project}/{repo}.git", "push", "--mirror", f"https://github.com/{GITHUB_OWNER}/{self.repo}.git"]
+    try:
+        print("Pushing to GitHub: {self.workspace}/{self.project}/{self.repo}")
+        subprocess.run(command, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        logging.error(e.stderr)
+        print("ERROR: See log file for details")
+
+  def push_lfs(self):
+    command = ["git", "-C", f"mirrors/{self.workspace}/{self.project}/{repo}.git", "lfs", "push", "--all", f"https://github.com/{GITHUB_OWNER}/{self.repo}.git"]
     try:
         print("Pushing to GitHub: {self.workspace}/{self.project}/{self.repo}")
         subprocess.run(command, capture_output=True, text=True, check=True)
@@ -90,9 +107,5 @@ for workspace in result:
     for repo in os.listdir(f"{base_path}/{workspace}/{project}"):
       jobs += GitHubRepoMapping(workspace, project, repo)
 
-print(jobs)
-
-for job in jobs:
-  job.create_repo()
-  job.apply_topics()
-  job.push_repo()
+with concurrent.futures.ThreadPoolExecutor(max_workers=num_cores) as executor:
+    executor.map(lambda job: job.do_it(), jobs)
