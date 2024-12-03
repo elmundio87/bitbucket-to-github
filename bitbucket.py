@@ -4,8 +4,10 @@ import subprocess
 import os
 import logging
 import time
+import concurrent.futures
 
 load_dotenv() # Create a .env file with your Bitbucket username and app password
+num_cores = os.cpu_count()
 
 # Replace with your Bitbucket username and app password
 BITBUCKET_USERNAME = os.getenv("BITBUCKET_USERNAME")
@@ -34,7 +36,6 @@ def git_clone(workspace, project, repo):
     print(f"Cloning: {workspace}/{project}/{repo}")
   try:
       result = subprocess.run(command, capture_output=True, text=True, check=True)
-      print(result.stdout.strip())
   except subprocess.CalledProcessError as e:
       logging.error(e.stderr)
       print("ERROR: See log file for details")
@@ -49,10 +50,16 @@ def main():
         username=BITBUCKET_USERNAME,
         password=BITBUCKET_APP_PASSWORD)
 
+    jobs = []
+
     for workspace in bitbucket.workspaces.each():
         for project in workspace.projects.each():
             for repo in project.repositories.each():
-                git_clone(workspace.slug, project.name, repo.name)
+                jobs += [(workspace.slug, project.name, repo.name)]
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_cores) as executor:
+        executor.map(lambda x: git_clone(*x), jobs)
+
 
 if __name__ == "__main__":
     main()
